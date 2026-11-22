@@ -129,7 +129,7 @@ func TestCreate(t *testing.T) {
 	}
 	if r.body["image"] != "nvidia/cuda:12.9.1-devel-ubuntu22.04" || r.body["disk"] != 150.0 ||
 		r.body["runtype"] != "ssh_direc ssh_proxy" || r.body["onstart"] != "echo hi" ||
-		r.body["label"] != label || !strings.HasPrefix(label, "boomr-") || r.body["client_id"] != "me" {
+		r.body["label"] != label || !strings.HasPrefix(label, "boostr-") || r.body["client_id"] != "me" {
 		t.Errorf("create body %v", r.body)
 	}
 	if _, ok := r.body["price"]; ok {
