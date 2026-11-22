@@ -36,6 +36,12 @@ var ErrNoKey = errors.New("no vast.ai API key: set " + KeyEnv + " or run `vastai
 // no_such_instance to everything, and was taken for a failure to retry).
 var ErrInstanceGone = errors.New("instance no longer exists at vast.ai")
 
+// ErrUnavailable means vast.ai refused a start because the host's GPUs are
+// rented to someone else. It answers 200 with "success": false and queues
+// the change: the instance starts, and bills, when the GPUs free up, unless
+// a stop is sent first.
+var ErrUnavailable = errors.New("the host's GPUs are rented to someone else")
+
 // Client talks to one vast.ai account. Key is empty for the public calls only.
 type Client struct {
 	BaseURL string
@@ -590,6 +596,18 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any, aut
 		err := fmt.Errorf("vast: %s: %s: %s", where, resp.Status, msg)
 		if resp.StatusCode == http.StatusNotFound || strings.Contains(msg, "no_such_instance") {
 			return fmt.Errorf("%w: %v", ErrInstanceGone, err)
+		}
+		return err
+	}
+	var refused struct {
+		Success *bool  `json:"success"`
+		Error   string `json:"error"`
+		Msg     string `json:"msg"`
+	}
+	if json.Unmarshal(data, &refused) == nil && refused.Success != nil && !*refused.Success {
+		err := fmt.Errorf("vast: %s: %s: %s", where, refused.Error, refused.Msg)
+		if refused.Error == "resources_unavailable" {
+			return fmt.Errorf("%w: %v", ErrUnavailable, err)
 		}
 		return err
 	}

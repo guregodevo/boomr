@@ -217,6 +217,15 @@ func TestStateAndKey(t *testing.T) {
 	if err := c.Start(context.Background(), 42); err != nil || f.last().body["state"] != "running" {
 		t.Errorf("start: %v, %v", err, f.last().body)
 	}
+	// A refused start is a 200 with "success": false, not a start.
+	f.handlers["PUT /instances/42/"] = reply(map[string]any{"success": false, "error": "resources_unavailable", "msg": "Required resources are currently unavailable, state change queued."})
+	if err := c.Start(context.Background(), 42); !errors.Is(err, ErrUnavailable) || !strings.Contains(err.Error(), "state change queued") {
+		t.Errorf("a refused start: %v, want ErrUnavailable with vast.ai's message", err)
+	}
+	f.handlers["PUT /instances/42/"] = reply(map[string]any{"success": false, "error": "invalid_args", "msg": "bad state"})
+	if err := c.Start(context.Background(), 42); err == nil || errors.Is(err, ErrUnavailable) {
+		t.Errorf("another refusal: %v, want a plain error", err)
+	}
 	c.Key = ""
 	if err := c.Destroy(context.Background(), 42); !errors.Is(err, ErrNoKey) {
 		t.Errorf("destroy with no key: %v", err)

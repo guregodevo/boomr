@@ -77,6 +77,9 @@ func run(args []string, out io.Writer) error {
 			do, said = c.Destroy, "destroyed"
 		}
 		if err := do(ctx, id); err != nil {
+			if cmd == "start" && errors.Is(err, vast.ErrUnavailable) {
+				return fmt.Errorf("instance %d did not start: %v\nvast.ai queued the start: it runs, and bills, when the GPUs free up; `boomr stop %d` cancels it", id, err, id)
+			}
 			return err
 		}
 		fmt.Fprintf(out, "instance %d %s\n", id, said)
