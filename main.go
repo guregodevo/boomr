@@ -1,4 +1,4 @@
-// boomr rents GPU machines on vast.ai from the command line.
+// boostr rents GPU machines on vast.ai from the command line.
 package main
 
 import (
@@ -15,20 +15,20 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/guregodevo/boomr/vast"
+	"github.com/guregodevo/boostr/vast"
 )
 
-const usage = `boomr rents GPU machines on vast.ai.
+const usage = `boostr rents GPU machines on vast.ai.
 
-  boomr offers [filters]                     the cheapest matching offers (no key needed)
-  boomr up --image IMG --disk GB [filters]   rent the cheapest matching offer
-  boomr ls                                   your instances
-  boomr ssh ID [command]                     ssh into an instance
-  boomr logs ID [--tail N]                   the container's log
-  boomr stop ID | start ID                   stop (the disk is still billed) or start one
-  boomr rm ID                                destroy one and its disk
-  boomr credit                               the account's balance
-  boomr key add [PUBKEY_FILE]                add an SSH public key to the account
+  boostr offers [filters]                     the cheapest matching offers (no key needed)
+  boostr up --image IMG --disk GB [filters]   rent the cheapest matching offer
+  boostr ls                                   your instances
+  boostr ssh ID [command]                     ssh into an instance
+  boostr logs ID [--tail N]                   the container's log
+  boostr stop ID | start ID                   stop (the disk is still billed) or start one
+  boostr rm ID                                destroy one and its disk
+  boostr credit                               the account's balance
+  boostr key add [PUBKEY_FILE]                add an SSH public key to the account
 
 filters: --gpu "H100 SXM,H100 PCIE"  --gpus 1  --min-gpu-ram GB  --max-price $/h
          --min-disk GB  --min-down Mb/s  --min-cuda 12.8  --unverified
@@ -39,7 +39,7 @@ The API key is read from VAST_API_KEY, else ~/.config/vastai/vast_api_key.
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
-		fmt.Fprintln(os.Stderr, "boomr:", err)
+		fmt.Fprintln(os.Stderr, "boostr:", err)
 		os.Exit(1)
 	}
 }
@@ -78,7 +78,7 @@ func run(args []string, out io.Writer) error {
 		}
 		if err := do(ctx, id); err != nil {
 			if cmd == "start" && errors.Is(err, vast.ErrUnavailable) {
-				return fmt.Errorf("instance %d did not start: %v\nvast.ai queued the start: it runs, and bills, when the GPUs free up; `boomr stop %d` cancels it", id, err, id)
+				return fmt.Errorf("instance %d did not start: %v\nvast.ai queued the start: it runs, and bills, when the GPUs free up; `boostr stop %d` cancels it", id, err, id)
 			}
 			return err
 		}
@@ -94,7 +94,7 @@ func run(args []string, out io.Writer) error {
 	case "key":
 		return key(ctx, c, rest, out)
 	}
-	return fmt.Errorf("unknown command %q (boomr help)", cmd)
+	return fmt.Errorf("unknown command %q (boostr help)", cmd)
 }
 
 type filters struct {
@@ -185,7 +185,7 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	var wait bool
 	fs.StringVar(&spec.Image, "image", "", "the Docker image, pinned to a tag (required)")
 	fs.Float64Var(&spec.DiskGB, "disk", 0, "the instance's disk, GB (required)")
-	fs.StringVar(&spec.Label, "label", "", "a name for the instance (default: a minted boomr-… label)")
+	fs.StringVar(&spec.Label, "label", "", "a name for the instance (default: a minted boostr-… label)")
 	fs.StringVar(&onstart, "onstart", "", "a script file run when the instance starts")
 	fs.Float64Var(&spec.BidPrice, "bid-price", 0, "with --bid, the $/h to bid (default: the offer's minimum)")
 	fs.Int64Var(&offerID, "offer", 0, "rent this offer instead of the cheapest match")
@@ -236,13 +236,13 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 			return err
 		}
 		if host, port, ok := in.SSH(); in.Running() && ok {
-			fmt.Fprintf(out, "running: ssh -p %s root@%s   (boomr ssh %d)\n", port, host, id)
+			fmt.Fprintf(out, "running: ssh -p %s root@%s   (boostr ssh %d)\n", port, host, id)
 			return nil
 		}
 		fmt.Fprintf(out, "  %s %s\n", in.ActualStatus, strings.TrimSpace(in.StatusMsg))
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("instance %d not running yet: %w (boomr ls)", id, ctx.Err())
+			return fmt.Errorf("instance %d not running yet: %w (boostr ls)", id, ctx.Err())
 		case <-time.After(10 * time.Second):
 		}
 	}
@@ -307,7 +307,7 @@ func logs(ctx context.Context, c *vast.Client, args []string, out io.Writer) err
 
 func key(ctx context.Context, c *vast.Client, args []string, out io.Writer) error {
 	if len(args) == 0 || args[0] != "add" {
-		return errors.New("usage: boomr key add [PUBKEY_FILE]")
+		return errors.New("usage: boostr key add [PUBKEY_FILE]")
 	}
 	path := ""
 	if len(args) > 1 {
@@ -337,7 +337,7 @@ func key(ctx context.Context, c *vast.Client, args []string, out io.Writer) erro
 
 func instanceID(args []string) (int64, error) {
 	if len(args) == 0 {
-		return 0, errors.New("name the instance id (boomr ls)")
+		return 0, errors.New("name the instance id (boostr ls)")
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {
