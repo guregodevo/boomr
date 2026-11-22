@@ -17,7 +17,7 @@ boomr key add                    # your ~/.ssh public key, once per account
 | `boomr ls` | your instances: state, $/h, uptime, ssh address |
 | `boomr ssh ID [command]` | ssh into one |
 | `boomr logs ID [--tail N]` | its container log |
-| `boomr stop ID` / `boomr start ID` | stop it (only the disk is billed) or start it again on the same disk |
+| `boomr stop ID` / `boomr start ID` | stop it (only the disk is billed) or start it again on the same disk; when the host's GPUs are rented out, vast.ai queues the start, boomr says so, and `boomr stop ID` cancels it |
 | `boomr rm ID` | destroy it and its disk |
 | `boomr credit` | the account's balance |
 
