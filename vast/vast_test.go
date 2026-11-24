@@ -231,3 +231,22 @@ func TestStateAndKey(t *testing.T) {
 		t.Errorf("destroy with no key: %v", err)
 	}
 }
+
+// A bid on a named offer needs that offer's minimum: without a price vast.ai
+// rents it on-demand.
+func TestOfferIsFoundByItsContractID(t *testing.T) {
+	f, c := newFake(t, "")
+	f.handlers["GET /bundles/"] = reply(map[string]any{"offers": []map[string]any{{"id": 56026378, "min_bid": 0.2, "dph_total": 0.71}}})
+	o, err := c.Offer(context.Background(), 56026378, Bid)
+	if err != nil || o.MinBid != 0.2 {
+		t.Fatalf("Offer = %+v, %v", o, err)
+	}
+	qs, _ := url.ParseQuery(f.last().query)
+	if q := qs.Get("q"); q != `{"ask_contract_id":{"eq":56026378},"type":"bid"}` {
+		t.Errorf("query %s", q)
+	}
+	f.handlers["GET /bundles/"] = reply(map[string]any{"offers": []map[string]any{}})
+	if _, err := c.Offer(context.Background(), 1, Bid); err == nil {
+		t.Error("an offer vast.ai does not list was found")
+	}
+}
