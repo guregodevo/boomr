@@ -221,6 +221,17 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 		if f.bid && spec.BidPrice == 0 {
 			spec.BidPrice = os[0].MinBid
 		}
+	} else if f.bid && spec.BidPrice == 0 {
+		// Without a price the rental is on-demand: --bid --offer rented an A40
+		// at $0.71/h, not its $0.20 minimum bid (2026-11-24).
+		o, err := c.Offer(ctx, offerID, vast.Bid)
+		if err != nil {
+			return err
+		}
+		spec.BidPrice = o.MinBid
+	}
+	if f.bid && spec.BidPrice <= 0 {
+		return fmt.Errorf("offer %d has no bid price: pass --bid-price", offerID)
 	}
 	id, label, err := c.Create(ctx, offerID, spec)
 	if err != nil {

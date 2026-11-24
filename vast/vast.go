@@ -283,6 +283,26 @@ func (c *Client) Offers(ctx context.Context, sel Selectors) ([]Offer, error) {
 	return kept, nil
 }
 
+// Offer is offer id as a rental of that type lists it; a bid's minimum price
+// is on the offer alone. vast.ai's search filters an offer on ask_contract_id:
+// "id" matches nothing.
+func (c *Client) Offer(ctx context.Context, id int64, rentalType string) (Offer, error) {
+	b, err := json.Marshal(map[string]any{"ask_contract_id": map[string]any{"eq": id}, "type": rentalType})
+	if err != nil {
+		return Offer{}, err
+	}
+	var out struct {
+		Offers []Offer `json:"offers"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/bundles/?q="+url.QueryEscape(string(b)), nil, &out, false); err != nil {
+		return Offer{}, err
+	}
+	if len(out.Offers) == 0 {
+		return Offer{}, fmt.Errorf("vast: offer %d is not listed for a %s rental", id, rentalType)
+	}
+	return out.Offers[0], nil
+}
+
 // Run types: an SSH machine that runs OnStart, or a container that runs its
 // image's entrypoint with Args.
 const (
