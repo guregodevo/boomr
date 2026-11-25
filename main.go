@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -31,7 +32,8 @@ const usage = `boostr rents GPU machines on vast.ai.
   boostr ls                                   your instances
   boostr ssh ID [command]                     ssh into an instance
   boostr logs ID [--tail N]                   the container's log
-  boostr stop ID | start ID                   stop (the disk is still billed) or start one
+  boostr stop ID [--keep]                     destroy one; --keep stops it and keeps its disk (billed)
+  boostr start ID                             start a kept one again
   boostr rm ID                                destroy one and its disk
   boostr credit                               the account's balance
   boostr key add [PUBKEY_FILE]                add an SSH public key to the account
@@ -77,20 +79,26 @@ func run(args []string, out io.Writer) error {
 	case "deploy":
 		return deploy(ctx, c, rest, out)
 	case "stop", "start", "rm":
-		id, err := instanceID(rest)
+		id, keep, err := lifecycleArgs(cmd, rest)
 		if err != nil {
 			return err
 		}
-		do, said := c.Stop, "stopped"
-		switch cmd {
-		case "start":
+		do, said := c.Destroy, "destroyed"
+		switch {
+		case cmd == "stop" && keep:
+			do, said = c.Stop, fmt.Sprintf("stopped; its disk is kept and billed (boostr start %d, boostr rm %d)", id, id)
+		case cmd == "stop":
+			// A stopped box bills its disk, and its host may have rented the
+			// GPU out by the time it is started again (vast.ai then queues
+			// the start for as long as that lasts): a stop destroys unless
+			// --keep says otherwise.
+			said = "destroyed (boostr stop --keep keeps its disk)"
+		case cmd == "start":
 			do, said = c.Start, "starting"
-		case "rm":
-			do, said = c.Destroy, "destroyed"
 		}
 		if err := do(ctx, id); err != nil {
 			if cmd == "start" && errors.Is(err, vast.ErrUnavailable) {
-				return fmt.Errorf("instance %d did not start: %v\nvast.ai queued the start: it runs, and bills, when the GPUs free up; `boostr stop %d` cancels it", id, err, id)
+				return fmt.Errorf("instance %d did not start: %v\nvast.ai queued the start: it runs, and bills, when the GPUs free up; `boostr stop --keep %d` cancels it, `boostr stop %d` destroys the instance", id, err, id, id)
 			}
 			return err
 		}
@@ -381,6 +389,17 @@ func key(ctx context.Context, c *vast.Client, args []string, out io.Writer) erro
 	}
 	fmt.Fprintf(out, "added %s to the account\n", path)
 	return nil
+}
+
+// lifecycleArgs reads stop, start and rm's arguments: the id, and for a
+// stop whether --keep (before or after it) keeps the instance's disk.
+func lifecycleArgs(cmd string, args []string) (id int64, keep bool, err error) {
+	keep = slices.Contains(args, "--keep")
+	if keep && cmd != "stop" {
+		return 0, false, fmt.Errorf("--keep is for boostr stop")
+	}
+	id, err = instanceID(slices.DeleteFunc(slices.Clone(args), func(a string) bool { return a == "--keep" }))
+	return id, keep, err
 }
 
 func instanceID(args []string) (int64, error) {
