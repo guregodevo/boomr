@@ -22,6 +22,12 @@ const usage = `boostr rents GPU machines on vast.ai.
 
   boostr offers [filters]                     the cheapest matching offers (no key needed)
   boostr up --image IMG --disk GB [filters]   rent the cheapest matching offer
+     [--with janis,memdoor]                   install them at start, return when they are ready
+     [--onstart SCRIPT [--ready]]             run SCRIPT at start; --ready waits until it is done
+  boostr wait ID [--timeout 1h]               wait until an instance's setup is done
+  boostr deploy ID --with janis,memdoor       install or upgrade them on a running instance
+  boostr recipe janis,memdoor                 print the setup script --with runs
+     --with's versions: --janis-ref main  --model Qwen3.8-27B-4bit  --model-rev main  --memdoor latest
   boostr ls                                   your instances
   boostr ssh ID [command]                     ssh into an instance
   boostr logs ID [--tail N]                   the container's log
@@ -64,6 +70,12 @@ func run(args []string, out io.Writer) error {
 		return sshInto(ctx, c, rest)
 	case "logs":
 		return logs(ctx, c, rest, out)
+	case "wait":
+		return waitCmd(ctx, c, rest, out)
+	case "recipe":
+		return recipeCmd(ctx, rest, out)
+	case "deploy":
+		return deploy(ctx, c, rest, out)
 	case "stop", "start", "rm":
 		id, err := instanceID(rest)
 		if err != nil {
@@ -181,8 +193,10 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	f.register(fs)
 	var spec vast.Spec
 	var offerID int64
-	var onstart string
-	var wait bool
+	var onstart, with string
+	var want pins
+	var wait, ready bool
+	var readyTimeout time.Duration
 	fs.StringVar(&spec.Image, "image", "", "the Docker image, pinned to a tag (required)")
 	fs.Float64Var(&spec.DiskGB, "disk", 0, "the instance's disk, GB (required)")
 	fs.StringVar(&spec.Label, "label", "", "a name for the instance (default: a minted boostr-… label)")
@@ -190,8 +204,15 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	fs.Float64Var(&spec.BidPrice, "bid-price", 0, "with --bid, the $/h to bid (default: the offer's minimum)")
 	fs.Int64Var(&offerID, "offer", 0, "rent this offer instead of the cheapest match")
 	fs.BoolVar(&wait, "wait", true, "wait until the instance runs and print how to ssh in")
+	fs.StringVar(&with, "with", "", "install these at start: "+strings.Join(recipes, ",")+" (implies --ready)")
+	want.register(fs)
+	fs.BoolVar(&ready, "ready", false, "then wait until the setup writes "+readyFile)
+	fs.DurationVar(&readyTimeout, "ready-timeout", time.Hour, "how long --ready waits for the setup")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if onstart != "" && with != "" {
+		return errors.New("--onstart or --with, not both")
 	}
 	if onstart != "" {
 		b, err := os.ReadFile(onstart)
@@ -199,6 +220,19 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 			return err
 		}
 		spec.OnStart = string(b)
+	}
+	if with != "" {
+		s, err := pinnedScript(ctx, with, want, out)
+		if err != nil {
+			return err
+		}
+		spec.OnStart, ready = s, true
+		if spec.Image == "" {
+			spec.Image = recipeImage
+		}
+		if spec.DiskGB == 0 {
+			spec.DiskGB = recipeDiskGB
+		}
 	}
 	if err := spec.Validate(); err != nil {
 		return err
@@ -248,7 +282,10 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 		}
 		if host, port, ok := in.SSH(); in.Running() && ok {
 			fmt.Fprintf(out, "running: ssh -p %s root@%s   (boostr ssh %d)\n", port, host, id)
-			return nil
+			if !ready {
+				return nil
+			}
+			return waitSetup(ctx, c, id, readyTimeout, out)
 		}
 		fmt.Fprintf(out, "  %s %s\n", in.ActualStatus, strings.TrimSpace(in.StatusMsg))
 		select {
