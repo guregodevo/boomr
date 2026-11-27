@@ -22,11 +22,10 @@ func fakeJanis(t *testing.T, id string, calls *sync.Map) *httptest.Server {
 	return srv
 }
 
-func chat(t *testing.T, h http.Handler, run, step, body string) (int, string) {
+func chat(t *testing.T, h http.Handler, run, body string) (int, string) {
 	t.Helper()
 	req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(body))
 	req.Header.Set(HeaderRun, run)
-	req.Header.Set(HeaderStep, step)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec.Code, rec.Body.String()
@@ -44,7 +43,7 @@ func TestChatGoesToTheStepsBox(t *testing.T) {
 		r.Add(Member{ID: bx.id, Endpoint: bx.url, ProviderID: "gpu-" + bx.id})
 	}
 	body := `{"model":"Inkling-2-Mini-4bit","messages":[{"role":"user","content":"hi"}]}`
-	code, first := chat(t, h, "run-1", "goal", body)
+	code, first := chat(t, h, "run-1", body)
 	if code != 200 {
 		t.Fatalf("chat: %d %s", code, first)
 	}
@@ -53,13 +52,13 @@ func TestChatGoesToTheStepsBox(t *testing.T) {
 	}
 	box := strings.Split(strings.Split(first, `"box":"`)[1], `"`)[0]
 	for i := 0; i < 4; i++ {
-		_, again := chat(t, h, "run-1", "goal", body)
+		_, again := chat(t, h, "run-1", body)
 		if !strings.Contains(again, `"box":"`+box+`"`) {
 			t.Fatalf("the step moved off %s: %s", box, again)
 		}
 	}
 	// the step ends; its box is free
-	req := httptest.NewRequest("POST", "/v1/step/done?run=run-1&step=goal", nil)
+	req := httptest.NewRequest("POST", "/v1/run/done?run=run-1", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != 200 {
@@ -67,7 +66,7 @@ func TestChatGoesToTheStepsBox(t *testing.T) {
 	}
 }
 
-// A call without the run and the step is refused, not sent to a box.
+// A call without the run is refused, not sent to a box.
 func TestChatNeedsRunAndStep(t *testing.T) {
 	r := New(0, 0)
 	h := NewServer(r).Handler()
@@ -75,7 +74,7 @@ func TestChatNeedsRunAndStep(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != 400 {
-		t.Fatalf("no run or step: %d, want 400", rec.Code)
+		t.Fatalf("no run: %d, want 400", rec.Code)
 	}
 }
 
@@ -86,7 +85,7 @@ func TestADeadBoxIsA502NamingIt(t *testing.T) {
 	dead.Close()
 	r := New(0, 0)
 	r.Add(Member{ID: "gone", Endpoint: url, ProviderID: "gpu-gone"})
-	code, body := chat(t, NewServer(r).Handler(), "run-1", "goal", "{}")
+	code, body := chat(t, NewServer(r).Handler(), "run-1", "{}")
 	if code != 502 || !strings.Contains(body, "gone") {
 		t.Fatalf("dead box: %d %s", code, body)
 	}

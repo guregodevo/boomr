@@ -25,7 +25,7 @@ func TestTheBoxAPI(t *testing.T) {
 			t.Fatalf("add %s: %d %s", id, code, body)
 		}
 	}
-	code, body := do(t, h, "GET", "/box?run=run1&step=goal", "")
+	code, body := do(t, h, "GET", "/box?run=run1", "")
 	if code != 200 {
 		t.Fatalf("box: %d %s", code, body)
 	}
@@ -34,16 +34,16 @@ func TestTheBoxAPI(t *testing.T) {
 	if m.Endpoint == "" || m.ProviderID == "" {
 		t.Fatalf("box without an endpoint or a provider id: %s", body)
 	}
-	if _, again := do(t, h, "GET", "/box?run=run1&step=goal", ""); again != body {
+	if _, again := do(t, h, "GET", "/box?run=run1", ""); again != body {
 		t.Errorf("the step moved: %s then %s", body, again)
 	}
-	if code, _ := do(t, h, "POST", "/release?run=run1&step=goal", ""); code != 200 {
+	if code, _ := do(t, h, "POST", "/release?run=run1", ""); code != 200 {
 		t.Errorf("release: %d", code)
 	}
-	if code, _ := do(t, h, "POST", "/release?run=run1&step=goal", ""); code != 404 {
+	if code, _ := do(t, h, "POST", "/release?run=run1", ""); code != 404 {
 		t.Errorf("a second release: %d, want 404", code)
 	}
-	if code, _ := do(t, h, "GET", "/box?run=run1", ""); code != 400 {
+	if code, _ := do(t, h, "GET", "/box?run=", ""); code != 400 {
 		t.Errorf("missing step: %d, want 400", code)
 	}
 	if code, body := do(t, h, "GET", "/ring", ""); code != 200 || !strings.Contains(body, `"members"`) {
@@ -56,7 +56,7 @@ func TestTheDrainAPI(t *testing.T) {
 	r := New(0, 0)
 	h := NewServer(r).Handler()
 	do(t, h, "POST", "/add", `{"id":"a","endpoint":"http://a:8093","provider_id":"gpu-a"}`)
-	_, body := do(t, h, "GET", "/box?run=run1&step=goal", "")
+	_, body := do(t, h, "GET", "/box?run=run1", "")
 	var m Member
 	json.Unmarshal([]byte(body), &m)
 	if code, _ := do(t, h, "POST", "/drain?id="+m.ID, ""); code != 200 {
@@ -65,7 +65,7 @@ func TestTheDrainAPI(t *testing.T) {
 	if code, _ := do(t, h, "POST", "/remove?id="+m.ID, ""); code != 409 {
 		t.Errorf("removing a box with a step: %d, want 409", code)
 	}
-	do(t, h, "POST", "/release?run=run1&step=goal", "")
+	do(t, h, "POST", "/release?run=run1", "")
 	if code, _ := do(t, h, "POST", "/remove?id="+m.ID, ""); code != 200 {
 		t.Errorf("removing an empty box: %d", code)
 	}

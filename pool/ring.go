@@ -1,5 +1,6 @@
-// Package pool places agent steps on rented boxes: a consistent-hash ring
-// over the boxes, with bounded load, sticky until a step is released. Boxes
+// Package pool places runs on rented boxes: a consistent-hash ring over the
+// boxes, with bounded load, sticky until the run is released. A run is a
+// workflow run, or one TUI turn with no workflow. Boxes
 // may be added or drained at any moment; a step on a drained box stays there
 // until it finishes.
 package pool
@@ -19,14 +20,14 @@ type Member struct {
 	ID         string `json:"id"`          // the rented instance's id
 	Endpoint   string `json:"endpoint"`    // janis's base address, http://host:port
 	ProviderID string `json:"provider_id"` // the memdoor provider id that names this box, e.g. gpu2
-	Draining   bool   `json:"draining"`    // no new steps; the steps it has run on
-	Active     int    `json:"active"`      // steps on it now
+	Draining   bool   `json:"draining"`    // no new runs; the runs it has keep it
+	Active     int    `json:"active"`      // runs on it now
 }
 
-// Assignment is where one step runs.
+// Assignment is where one run is.
 type Assignment struct {
-	Run, Step string
-	Member    string
+	Run    string `json:"run"`
+	Member string `json:"member"`
 }
 
 // ErrEmpty is returned when no box is live.
@@ -39,7 +40,7 @@ type Ring struct {
 	load    float64 // bounded-load factor c: a box takes at most c times the average
 	members map[string]*Member
 	points  []point           // the live boxes' virtual nodes, sorted by hash
-	sticky  map[string]string // step key -> member id
+	sticky  map[string]string // run -> member id
 }
 
 type point struct {
@@ -66,8 +67,6 @@ func hash(s string) uint64 {
 	sum := sha256.Sum256([]byte(s))
 	return binary.BigEndian.Uint64(sum[:8])
 }
-
-func key(run, step string) string { return run + "\x00" + step }
 
 // Add puts a box on the ring. A box with the same id replaces the old one.
 func (r *Ring) Add(m Member) error {
@@ -108,7 +107,7 @@ func (r *Ring) Remove(id string) error {
 		return fmt.Errorf("pool: no box %s", id)
 	}
 	if m.Active > 0 {
-		return fmt.Errorf("pool: box %s has %d steps", id, m.Active)
+		return fmt.Errorf("pool: box %s has %d runs", id, m.Active)
 	}
 	delete(r.members, id)
 	r.rebuild()
@@ -139,19 +138,18 @@ func (r *Ring) live() int {
 	return n
 }
 
-// Place returns the box for a step. A step placed before keeps its box while
-// that box exists, drained or not. A new step goes to the first live box
+// Place returns the box for a run. A run placed before keeps its box while
+// that box exists, drained or not. A new run goes to the first live box
 // clockwise from its key that is under the load bound; with every live box
 // at its bound, the least loaded one.
-func (r *Ring) Place(run, step string) (Member, error) {
+func (r *Ring) Place(run string) (Member, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	k := key(run, step)
-	if id, ok := r.sticky[k]; ok {
+	if id, ok := r.sticky[run]; ok {
 		if m, ok := r.members[id]; ok {
 			return *m, nil
 		}
-		delete(r.sticky, k) // its box was removed: place it again
+		delete(r.sticky, run) // its box was removed: place it again
 	}
 	n := r.live()
 	if n == 0 {
@@ -165,7 +163,7 @@ func (r *Ring) Place(run, step string) (Member, error) {
 	if bound < 1 {
 		bound = 1
 	}
-	h := hash(k)
+	h := hash(run)
 	start := sort.Search(len(r.points), func(i int) bool { return r.points[i].h >= h })
 	var pick *Member
 	for i := 0; i < len(r.points); i++ {
@@ -184,20 +182,19 @@ func (r *Ring) Place(run, step string) (Member, error) {
 		}
 	}
 	pick.Active++
-	r.sticky[k] = pick.ID
+	r.sticky[run] = pick.ID
 	return *pick, nil
 }
 
-// Release ends a step: its box is free for another.
-func (r *Ring) Release(run, step string) error {
+// Release ends a run: its box is free for another.
+func (r *Ring) Release(run string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	k := key(run, step)
-	id, ok := r.sticky[k]
+	id, ok := r.sticky[run]
 	if !ok {
-		return fmt.Errorf("pool: no step %s/%s", run, step)
+		return fmt.Errorf("pool: no run %s", run)
 	}
-	delete(r.sticky, k)
+	delete(r.sticky, run)
 	if m, ok := r.members[id]; ok && m.Active > 0 {
 		m.Active--
 	}
@@ -216,26 +213,14 @@ func (r *Ring) Members() []Member {
 	return out
 }
 
-// Steps returns the steps placed now.
-func (r *Ring) Steps() []Assignment {
+// Runs returns the runs placed now, sorted by run.
+func (r *Ring) Runs() []Assignment {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := make([]Assignment, 0, len(r.sticky))
-	for k, id := range r.sticky {
-		run, step := k, ""
-		for i := 0; i < len(k); i++ {
-			if k[i] == 0 {
-				run, step = k[:i], k[i+1:]
-				break
-			}
-		}
-		out = append(out, Assignment{Run: run, Step: step, Member: id})
+	for run, id := range r.sticky {
+		out = append(out, Assignment{Run: run, Member: id})
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Run != out[j].Run {
-			return out[i].Run < out[j].Run
-		}
-		return out[i].Step < out[j].Step
-	})
+	sort.Slice(out, func(i, j int) bool { return out[i].Run < out[j].Run })
 	return out
 }

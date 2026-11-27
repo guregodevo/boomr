@@ -7,22 +7,19 @@ import (
 	"net/url"
 )
 
-// The headers memdoor sends with each model call: the run and the step.
-const (
-	HeaderRun  = "X-Memdoor-Run"
-	HeaderStep = "X-Memdoor-Step"
-)
+// The header memdoor sends with each model call: the run.
+const HeaderRun = "X-Memdoor-Run"
 
 // Chat forwards an OpenAI-style chat request to the box the ring gives its
-// step, and streams the reply back. Memdoor talks only to boostr: it names
-// its run and step, and boostr chooses the box.
+// run, and streams the reply back. Memdoor talks only to boostr: it names
+// its run, and boostr chooses the box.
 func (s *Server) Chat(w http.ResponseWriter, r *http.Request) {
-	run, step := r.Header.Get(HeaderRun), r.Header.Get(HeaderStep)
-	if run == "" || step == "" {
-		fail(w, http.StatusBadRequest, errors.New(HeaderRun+" and "+HeaderStep+" are needed"))
+	run := r.Header.Get(HeaderRun)
+	if run == "" {
+		fail(w, http.StatusBadRequest, errors.New(HeaderRun+" is needed"))
 		return
 	}
-	m, err := s.ring.Place(run, step)
+	m, err := s.ring.Place(run)
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, err)
 		return
@@ -43,7 +40,7 @@ func (s *Server) Chat(w http.ResponseWriter, r *http.Request) {
 		},
 		FlushInterval: -1, // a streamed reply goes out as it comes
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			// The box did not answer: the step stays placed, and memdoor may
+			// The box did not answer: the run stays placed, and memdoor may
 			// ask again; the reply says which box and why.
 			fail(w, http.StatusBadGateway, errors.New("box "+m.ID+": "+err.Error()))
 		},
@@ -51,8 +48,8 @@ func (s *Server) Chat(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
-// StepDone ends a step: its box is free for another, and the next call for
-// that step is placed again.
-func (s *Server) StepDone(w http.ResponseWriter, r *http.Request) {
+// RunDone ends a run: its box is free for another, and the next call for
+// that run is placed again.
+func (s *Server) RunDone(w http.ResponseWriter, r *http.Request) {
 	s.release(w, r)
 }

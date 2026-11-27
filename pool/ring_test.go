@@ -16,12 +16,12 @@ func boxes(r *Ring, ids ...string) {
 func TestAStepStaysOnItsBox(t *testing.T) {
 	r := New(0, 0)
 	boxes(r, "a", "b", "c")
-	first, err := r.Place("run1", "think")
+	first, err := r.Place("run1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 5; i++ {
-		again, _ := r.Place("run1", "think")
+		again, _ := r.Place("run1")
 		if again.ID != first.ID {
 			t.Fatalf("step moved from %s to %s", first.ID, again.ID)
 		}
@@ -34,7 +34,7 @@ func TestStepsSpreadOverTheBoxes(t *testing.T) {
 	boxes(r, "a", "b", "c", "d")
 	counts := map[string]int{}
 	for i := 0; i < 400; i++ {
-		m, err := r.Place(fmt.Sprintf("run%d", i), "goal")
+		m, err := r.Place(fmt.Sprintf("run%d", i))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -53,21 +53,21 @@ func TestAddingABoxMovesAboutAQuarter(t *testing.T) {
 	boxes(r, "a", "b", "c")
 	before := map[string]string{}
 	for i := 0; i < 300; i++ {
-		m, _ := r.Place(fmt.Sprintf("run%d", i), "goal")
+		m, _ := r.Place(fmt.Sprintf("run%d", i))
 		before[fmt.Sprintf("run%d", i)] = m.ID
-		r.Release(fmt.Sprintf("run%d", i), "goal") // unload, so only the ring decides
+		r.Release(fmt.Sprintf("run%d", i)) // unload, so only the ring decides
 	}
 	boxes(r, "d")
 	moved := 0
 	for i := 0; i < 300; i++ {
-		m, _ := r.Place(fmt.Sprintf("run%d", i), "goal")
+		m, _ := r.Place(fmt.Sprintf("run%d", i))
 		if m.ID != before[fmt.Sprintf("run%d", i)] {
 			moved++
 			if m.ID != "d" {
 				t.Errorf("a step moved to %s, not to the new box", m.ID)
 			}
 		}
-		r.Release(fmt.Sprintf("run%d", i), "goal")
+		r.Release(fmt.Sprintf("run%d", i))
 	}
 	if moved < 40 || moved > 110 {
 		t.Errorf("%d of 300 steps moved to the new box, want about 75", moved)
@@ -78,24 +78,24 @@ func TestAddingABoxMovesAboutAQuarter(t *testing.T) {
 func TestADrainedBoxKeepsItsSteps(t *testing.T) {
 	r := New(0, 0)
 	boxes(r, "a", "b")
-	m, _ := r.Place("run1", "goal")
+	m, _ := r.Place("run1")
 	if err := r.Drain(m.ID); err != nil {
 		t.Fatal(err)
 	}
-	again, err := r.Place("run1", "goal")
+	again, err := r.Place("run1")
 	if err != nil || again.ID != m.ID {
 		t.Fatalf("drained box lost its step: %v %v", again.ID, err)
 	}
 	if err := r.Remove(m.ID); err == nil {
 		t.Fatal("removed a box with a step on it")
 	}
-	r.Release("run1", "goal")
+	r.Release("run1")
 	if err := r.Remove(m.ID); err != nil {
 		t.Fatalf("empty box not removed: %v", err)
 	}
 	// new steps do not go to the drained box
 	for i := 0; i < 20; i++ {
-		p, _ := r.Place(fmt.Sprintf("new%d", i), "goal")
+		p, _ := r.Place(fmt.Sprintf("new%d", i))
 		if p.ID == m.ID {
 			t.Fatal("a new step went to a drained box")
 		}
@@ -108,7 +108,7 @@ func TestBoundedLoadCapsOneBox(t *testing.T) {
 	boxes(r, "a", "b", "c")
 	max := 0
 	for i := 0; i < 60; i++ {
-		m, _ := r.Place(fmt.Sprintf("run%d", i), "goal")
+		m, _ := r.Place(fmt.Sprintf("run%d", i))
 		if m.Active > max {
 			max = m.Active
 		}
@@ -125,7 +125,7 @@ func TestBoundedLoadCapsOneBox(t *testing.T) {
 
 func TestNoBoxIsAnError(t *testing.T) {
 	r := New(0, 0)
-	if _, err := r.Place("run1", "goal"); err != ErrEmpty {
+	if _, err := r.Place("run1"); err != ErrEmpty {
 		t.Fatalf("got %v, want ErrEmpty", err)
 	}
 }

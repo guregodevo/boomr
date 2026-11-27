@@ -18,7 +18,7 @@ type Action struct {
 // Decide says what to do from the boxes' state. A box at its load bound with
 // the pool below Max asks for one more. A box idle for IdleFor, with more
 // than Min live boxes, is drained, the longest idle first. idle maps a box id
-// to how long it has had no steps.
+// to how long it has had no runs.
 func Decide(p Policy, members []Member, idle map[string]time.Duration) Action {
 	live := 0
 	total := 0

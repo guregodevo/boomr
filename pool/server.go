@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-// Server is the HTTP face of a ring: memdoor asks it for a box per step.
+// Server is the HTTP face of a ring: memdoor talks to it, and it talks to the boxes.
 //
-//	POST /v1/chat/completions   a model call, with the run and step in headers: forwarded to the step's box
-//	POST /v1/step/done?run=R&step=S   the step ends: its box is free
-//	GET  /box?run=R&step=S   the box for a step, for status (sticky)
-//	POST /release?run=R&step=S   the same as /v1/step/done
-//	GET  /ring               the boxes and the steps placed now
+//	POST /v1/chat/completions   a model call, with X-Memdoor-Run: forwarded to the run's box
+//	POST /v1/run/done?run=R   the run ends: its box is free
+//	GET  /box?run=R   the box for a run, for status (sticky)
+//	POST /release?run=R   the same as /v1/run/done
+//	GET  /ring               the boxes and the runs placed now
 //	POST /add                a box (JSON Member); a known id is replaced
 //	POST /drain?id=B         no new steps on B; its steps finish there
 //	POST /remove?id=B        forget B once it has no steps
@@ -34,7 +34,7 @@ func NewServer(ring *Ring) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/chat/completions", s.Chat)
-	mux.HandleFunc("POST /v1/step/done", s.StepDone)
+	mux.HandleFunc("POST /v1/run/done", s.RunDone)
 	mux.HandleFunc("GET /box", s.box)
 	mux.HandleFunc("POST /release", s.release)
 	mux.HandleFunc("GET /ring", s.ringState)
@@ -55,12 +55,12 @@ func fail(w http.ResponseWriter, code int, err error) {
 }
 
 func (s *Server) box(w http.ResponseWriter, r *http.Request) {
-	run, step := r.URL.Query().Get("run"), r.URL.Query().Get("step")
-	if run == "" || step == "" {
-		fail(w, http.StatusBadRequest, errors.New("run and step are needed"))
+	run := r.URL.Query().Get("run")
+	if run == "" {
+		fail(w, http.StatusBadRequest, errors.New("run is needed"))
 		return
 	}
-	m, err := s.ring.Place(run, step)
+	m, err := s.ring.Place(run)
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, err)
 		return
@@ -72,17 +72,17 @@ func (s *Server) box(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) release(w http.ResponseWriter, r *http.Request) {
-	run, step := r.URL.Query().Get("run"), r.URL.Query().Get("step")
-	if err := s.ring.Release(run, step); err != nil {
+	run := r.URL.Query().Get("run")
+	if err := s.ring.Release(run); err != nil {
 		fail(w, http.StatusNotFound, err)
 		return
 	}
 	s.markIdle()
-	writeJSON(w, http.StatusOK, map[string]string{"released": run + "/" + step})
+	writeJSON(w, http.StatusOK, map[string]string{"released": run})
 }
 
 func (s *Server) ringState(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"members": s.ring.Members(), "steps": s.ring.Steps()})
+	writeJSON(w, http.StatusOK, map[string]any{"members": s.ring.Members(), "runs": s.ring.Runs()})
 }
 
 func (s *Server) add(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +119,7 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"removed": id})
 }
 
-// markIdle records when each box last had no steps, for the scale policy.
+// markIdle records when each box last had no runs, for the scale policy.
 func (s *Server) markIdle() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -135,7 +135,7 @@ func (s *Server) markIdle() {
 	}
 }
 
-// IdleFor is how long each box has had no steps.
+// IdleFor is how long each box has had no runs.
 func (s *Server) IdleFor() map[string]time.Duration {
 	s.mu.Lock()
 	defer s.mu.Unlock()
