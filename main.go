@@ -78,6 +78,8 @@ func run(args []string, out io.Writer) error {
 		return recipeCmd(ctx, rest, out)
 	case "deploy":
 		return deploy(ctx, c, rest, out)
+	case "pool":
+		return poolCmd(ctx, rest, out)
 	case "stop", "start", "rm":
 		id, keep, err := lifecycleArgs(cmd, rest)
 		if err != nil {
