@@ -10,8 +10,10 @@ import (
 
 // Server is the HTTP face of a ring: memdoor asks it for a box per step.
 //
-//	GET  /box?run=R&step=S   the box for a step (sticky): id, endpoint, provider id
-//	POST /release?run=R&step=S   the step is done
+//	POST /v1/chat/completions   a model call, with the run and step in headers: forwarded to the step's box
+//	POST /v1/step/done?run=R&step=S   the step ends: its box is free
+//	GET  /box?run=R&step=S   the box for a step, for status (sticky)
+//	POST /release?run=R&step=S   the same as /v1/step/done
 //	GET  /ring               the boxes and the steps placed now
 //	POST /add                a box (JSON Member); a known id is replaced
 //	POST /drain?id=B         no new steps on B; its steps finish there
@@ -31,6 +33,8 @@ func NewServer(ring *Ring) *Server {
 // Handler is the server's routes.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/chat/completions", s.Chat)
+	mux.HandleFunc("POST /v1/step/done", s.StepDone)
 	mux.HandleFunc("GET /box", s.box)
 	mux.HandleFunc("POST /release", s.release)
 	mux.HandleFunc("GET /ring", s.ringState)
