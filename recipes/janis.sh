@@ -19,7 +19,7 @@ if [ "$(cat /root/.janis-built 2>/dev/null)" != "$JANIS_COMMIT" ] || ! [ -x /usr
   echo "$JANIS_COMMIT" > /root/.janis-built
 fi
 cd /root
-echo "janis $JANIS_COMMIT ($JANIS_REF)" >> /root/boostr-manifest.new
+echo "janis $JANIS_COMMIT ($JANIS_REF)" >> /root/hyperscalr-manifest.new
 
 echo "== $MODEL at $MODEL_REV"
 # One connection reads 3-5 MB/s from some vast hosts: each file in 8
@@ -46,4 +46,4 @@ for f in $(curl -fsSL "https://huggingface.co/api/models/$REPO/revision/$MODEL_R
 done
 for old in "$repo"/snapshots/*; do [ "$old" = "$snap" ] || rm -rf "$old"; done
 echo "$MODEL_REV" > "$repo/refs/main"
-echo "model $MODEL $MODEL_REV" >> /root/boostr-manifest.new
+echo "model $MODEL $MODEL_REV" >> /root/hyperscalr-manifest.new

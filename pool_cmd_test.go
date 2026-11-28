@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/guregodevo/boostr/pool"
+	"github.com/guregodevo/hyperscalr/pool"
 )
 
 func janisStub(t *testing.T) *httptest.Server {

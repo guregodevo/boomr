@@ -67,10 +67,10 @@ func TestASetupThatNeverEndsTimesOut(t *testing.T) {
 // The probe's answer is read past the host's ssh banner.
 func TestTheProbeIsReadPastTheBanner(t *testing.T) {
 	for in, want := range map[string]setup{
-		"Welcome to vast.ai.\nHave fun!\nboostr:ready\n":            {"ready", ""},
-		"boostr:running\n[ 40%] Building CUDA object\n":             {"setup running:", "[ 40%] Building CUDA object"},
-		"Welcome\nboostr:failed\nmake: *** Error 2\nfailed at 31\n": {"failed", "make: *** Error 2\nfailed at 31"},
-		"Welcome to vast.ai.\n":                                     {"waiting for ssh:", "no answer"},
+		"Welcome to vast.ai.\nHave fun!\nhyperscalr:ready\n":            {"ready", ""},
+		"hyperscalr:running\n[ 40%] Building CUDA object\n":             {"setup running:", "[ 40%] Building CUDA object"},
+		"Welcome\nhyperscalr:failed\nmake: *** Error 2\nfailed at 31\n": {"failed", "make: *** Error 2\nfailed at 31"},
+		"Welcome to vast.ai.\n":                                         {"waiting for ssh:", "no answer"},
 	} {
 		if got := parseProbe(in); got != want {
 			t.Errorf("parseProbe(%q) = %+v, want %+v", in, got, want)

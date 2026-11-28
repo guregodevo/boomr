@@ -33,7 +33,7 @@ func TestWithWritesOneScriptAtPinnedVersions(t *testing.T) {
 		"export MEMDOOR_RELEASE=v1.840.0\n",
 		"MEMDOOR_GITHUB_RELEASE=\"$MEMDOOR_RELEASE\"",
 		"resolve/$MODEL_REV/",
-		"mv /root/boostr-manifest.new /root/boostr-manifest\ntouch /root/boostr-ready\n",
+		"mv /root/hyperscalr-manifest.new /root/hyperscalr-manifest\ntouch /root/hyperscalr-ready\n",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("no %q in the script", want)
