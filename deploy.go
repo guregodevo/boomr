@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/guregodevo/boostr/vast"
+	"github.com/guregodevo/hyperscalr/vast"
 )
 
 func (p *pins) register(fs *flag.FlagSet) {
@@ -41,11 +41,11 @@ func pinnedScript(ctx context.Context, with string, want pins, out io.Writer) (s
 	return s, nil
 }
 
-// recipeCmd is `boostr recipe janis,memdoor [versions]`: the script --with
+// recipeCmd is `hyperscalr recipe janis,memdoor [versions]`: the script --with
 // would run now.
 func recipeCmd(ctx context.Context, args []string, out io.Writer) error {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		return fmt.Errorf("usage: boostr recipe %s [--janis-ref R] [--model M] [--model-rev R] [--memdoor TAG]", strings.Join(recipes, ","))
+		return fmt.Errorf("usage: hyperscalr recipe %s [--janis-ref R] [--model M] [--model-rev R] [--memdoor TAG]", strings.Join(recipes, ","))
 	}
 	fs := flag.NewFlagSet("recipe", flag.ContinueOnError)
 	var want pins
@@ -61,7 +61,7 @@ func recipeCmd(ctx context.Context, args []string, out io.Writer) error {
 	return nil
 }
 
-// deploy is `boostr deploy ID --with janis,memdoor [versions]`: the setup
+// deploy is `hyperscalr deploy ID --with janis,memdoor [versions]`: the setup
 // run on an instance that is already up, as the script its next start
 // runs too. What is at the asked version is kept, what differs upgraded.
 func deploy(ctx context.Context, c *vast.Client, args []string, out io.Writer) error {
@@ -79,7 +79,7 @@ func deploy(ctx context.Context, c *vast.Client, args []string, out io.Writer) e
 		return err
 	}
 	if with == "" {
-		return errors.New("usage: boostr deploy ID --with " + strings.Join(recipes, ","))
+		return errors.New("usage: hyperscalr deploy ID --with " + strings.Join(recipes, ","))
 	}
 	s, err := pinnedScript(ctx, with, want, out)
 	if err != nil {
@@ -91,11 +91,11 @@ func deploy(ctx context.Context, c *vast.Client, args []string, out io.Writer) e
 	}
 	host, port, ok := in.SSH()
 	if !in.Running() || !ok {
-		return fmt.Errorf("instance %d is not running (state %s): boostr start %d first", id, in.ActualStatus, id)
+		return fmt.Errorf("instance %d is not running (state %s): hyperscalr start %d first", id, in.ActualStatus, id)
 	}
 	// The markers go before the script starts, so the wait never reads the
 	// last setup's ready file.
-	run := "rm -f " + readyFile + " " + failedFile + " && cat > /root/boostr-setup.sh && BOOSTR_SETUP=1 setsid -f bash /root/boostr-setup.sh < /dev/null > /dev/null 2>&1"
+	run := "rm -f " + readyFile + " " + failedFile + " && cat > /root/hyperscalr-setup.sh && HYPERSCALR_SETUP=1 setsid -f bash /root/hyperscalr-setup.sh < /dev/null > /dev/null 2>&1"
 	cmd := exec.CommandContext(ctx, "ssh", "-p", port, "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15", "root@"+host, run)
 	cmd.Stdin = strings.NewReader(s)
 	if b, err := cmd.CombinedOutput(); err != nil {

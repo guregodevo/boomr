@@ -11,8 +11,8 @@ import (
 const HeaderRun = "X-Memdoor-Run"
 
 // Chat forwards an OpenAI-style chat request to the box the ring gives its
-// run, and streams the reply back. Memdoor talks only to boostr: it names
-// its run, and boostr chooses the box.
+// run, and streams the reply back. Memdoor talks only to hyperscalr: it names
+// its run, and hyperscalr chooses the box.
 func (s *Server) Chat(w http.ResponseWriter, r *http.Request) {
 	run := r.Header.Get(HeaderRun)
 	if run == "" {

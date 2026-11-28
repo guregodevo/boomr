@@ -31,7 +31,7 @@ func chat(t *testing.T, h http.Handler, run, body string) (int, string) {
 	return rec.Code, rec.Body.String()
 }
 
-// Memdoor names its run and step; boostr forwards the call to that step's box,
+// Memdoor names its run and step; hyperscalr forwards the call to that step's box,
 // and every call of a step goes to the same box until the step is done.
 func TestChatGoesToTheStepsBox(t *testing.T) {
 	var calls sync.Map

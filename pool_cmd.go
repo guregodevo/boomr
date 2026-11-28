@@ -16,15 +16,15 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/guregodevo/boostr/pool"
-	"github.com/guregodevo/boostr/vast"
+	"github.com/guregodevo/hyperscalr/pool"
+	"github.com/guregodevo/hyperscalr/vast"
 )
 
-// poolCmd is `boostr pool serve|ls|add|drain|remove`: the ring memdoor asks
+// poolCmd is `hyperscalr pool serve|ls|add|drain|remove`: the ring memdoor asks
 // for a box per run, and its scale loop. The ring is in memory for now.
 func poolCmd(ctx context.Context, c *vast.Client, args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return fmt.Errorf("boostr pool serve|ls|add|drain|remove")
+		return fmt.Errorf("hyperscalr pool serve|ls|add|drain|remove")
 	}
 	switch args[0] {
 	case "serve":
@@ -54,7 +54,7 @@ func poolCmd(ctx context.Context, c *vast.Client, args []string, out io.Writer) 
 			return err
 		}
 		if fs.NArg() == 0 {
-			return errors.New("boostr pool add ID... [--pool URL] [--port 8093]")
+			return errors.New("hyperscalr pool add ID... [--pool URL] [--port 8093]")
 		}
 		for _, a := range fs.Args() {
 			id, err := strconv.ParseInt(a, 10, 64)
@@ -75,7 +75,7 @@ func poolCmd(ctx context.Context, c *vast.Client, args []string, out io.Writer) 
 		}
 		return poolLs(ctx, *poolURL, out)
 	}
-	return fmt.Errorf("boostr pool %s: not yet", args[0])
+	return fmt.Errorf("hyperscalr pool %s: not yet", args[0])
 }
 
 const defaultPool = "http://127.0.0.1:18900"
@@ -113,7 +113,7 @@ func addBox(ctx context.Context, poolURL, id string, tunnel func() (string, erro
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("the pool at %s: %w (boostr pool serve)", poolURL, err)
+		return fmt.Errorf("the pool at %s: %w (hyperscalr pool serve)", poolURL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -191,7 +191,7 @@ func fetchRing(ctx context.Context, poolURL string) (ringState, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return st, fmt.Errorf("the pool at %s: %w (boostr pool serve)", poolURL, err)
+		return st, fmt.Errorf("the pool at %s: %w (hyperscalr pool serve)", poolURL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

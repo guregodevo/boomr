@@ -353,7 +353,7 @@ func (s Spec) Validate() error {
 func newLabel() string {
 	b := make([]byte, 6)
 	rand.Read(b)
-	return "boostr-" + hex.EncodeToString(b)
+	return "hyperscalr-" + hex.EncodeToString(b)
 }
 
 // Create rents offer id with spec and returns the new instance's id and the

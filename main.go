@@ -1,4 +1,4 @@
-// boostr rents GPU machines on vast.ai from the command line.
+// hyperscalr rents GPU machines on vast.ai from the command line.
 package main
 
 import (
@@ -16,31 +16,31 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/guregodevo/boostr/vast"
+	"github.com/guregodevo/hyperscalr/vast"
 )
 
-const usage = `boostr rents GPU machines on vast.ai.
+const usage = `hyperscalr rents GPU machines on vast.ai.
 
-  boostr offers [filters]                     the cheapest matching offers (no key needed)
-  boostr up --image IMG --disk GB [filters]   rent the cheapest matching offer
+  hyperscalr offers [filters]                     the cheapest matching offers (no key needed)
+  hyperscalr up --image IMG --disk GB [filters]   rent the cheapest matching offer
      [--count N]                              the N cheapest matches, one instance each
      [--with janis,memdoor]                   install them at start, return when they are ready
      [--onstart SCRIPT [--ready]]             run SCRIPT at start; --ready waits until it is done
-  boostr wait ID [--timeout 1h]               wait until an instance's setup is done
-  boostr deploy ID --with janis,memdoor       install or upgrade them on a running instance
-  boostr recipe janis,memdoor                 print the setup script --with runs
+  hyperscalr wait ID [--timeout 1h]               wait until an instance's setup is done
+  hyperscalr deploy ID --with janis,memdoor       install or upgrade them on a running instance
+  hyperscalr recipe janis,memdoor                 print the setup script --with runs
      --with's versions: --janis-ref main  --model Qwen3.8-27B-4bit  --model-rev main  --memdoor latest
-  boostr ls                                   your instances
-  boostr ssh ID [command]                     ssh into an instance
-  boostr logs ID [--tail N]                   the container's log
-  boostr stop ID [--keep]                     destroy one; --keep stops it and keeps its disk (billed)
-  boostr start ID                             start a kept one again
-  boostr rm ID                                destroy one and its disk
-  boostr credit                               the account's balance
-  boostr pool serve [--addr HOST:PORT]        the ring memdoor's requests go through, one box per run
-  boostr pool add ID... [--port 8093]         tunnel to each box's janis and add it (again: a no-op)
-  boostr pool ls                              the ring's boxes and runs
-  boostr key add [PUBKEY_FILE]                add an SSH public key to the account
+  hyperscalr ls                                   your instances
+  hyperscalr ssh ID [command]                     ssh into an instance
+  hyperscalr logs ID [--tail N]                   the container's log
+  hyperscalr stop ID [--keep]                     destroy one; --keep stops it and keeps its disk (billed)
+  hyperscalr start ID                             start a kept one again
+  hyperscalr rm ID                                destroy one and its disk
+  hyperscalr credit                               the account's balance
+  hyperscalr pool serve [--addr HOST:PORT]        the ring memdoor's requests go through, one box per run
+  hyperscalr pool add ID... [--port 8093]         tunnel to each box's janis and add it (again: a no-op)
+  hyperscalr pool ls                              the ring's boxes and runs
+  hyperscalr key add [PUBKEY_FILE]                add an SSH public key to the account
 
 filters: --gpu "H100 SXM,H100 PCIE"  --gpus 1  --min-gpu-ram GB  --max-price $/h
          --min-disk GB  --min-down Mb/s  --min-cuda 12.8  --unverified
@@ -51,7 +51,7 @@ The API key is read from VAST_API_KEY, else ~/.config/vastai/vast_api_key.
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
-		fmt.Fprintln(os.Stderr, "boostr:", err)
+		fmt.Fprintln(os.Stderr, "hyperscalr:", err)
 		os.Exit(1)
 	}
 }
@@ -92,19 +92,19 @@ func run(args []string, out io.Writer) error {
 		do, said := c.Destroy, "destroyed"
 		switch {
 		case cmd == "stop" && keep:
-			do, said = c.Stop, fmt.Sprintf("stopped; its disk is kept and billed (boostr start %d, boostr rm %d)", id, id)
+			do, said = c.Stop, fmt.Sprintf("stopped; its disk is kept and billed (hyperscalr start %d, hyperscalr rm %d)", id, id)
 		case cmd == "stop":
 			// A stopped box bills its disk, and its host may have rented the
 			// GPU out by the time it is started again (vast.ai then queues
 			// the start for as long as that lasts): a stop destroys unless
 			// --keep says otherwise.
-			said = "destroyed (boostr stop --keep keeps its disk)"
+			said = "destroyed (hyperscalr stop --keep keeps its disk)"
 		case cmd == "start":
 			do, said = c.Start, "starting"
 		}
 		if err := do(ctx, id); err != nil {
 			if cmd == "start" && errors.Is(err, vast.ErrUnavailable) {
-				return fmt.Errorf("instance %d did not start: %v\nvast.ai queued the start: it runs, and bills, when the GPUs free up; `boostr stop --keep %d` cancels it, `boostr stop %d` destroys the instance", id, err, id, id)
+				return fmt.Errorf("instance %d did not start: %v\nvast.ai queued the start: it runs, and bills, when the GPUs free up; `hyperscalr stop --keep %d` cancels it, `hyperscalr stop %d` destroys the instance", id, err, id, id)
 			}
 			return err
 		}
@@ -120,7 +120,7 @@ func run(args []string, out io.Writer) error {
 	case "key":
 		return key(ctx, c, rest, out)
 	}
-	return fmt.Errorf("unknown command %q (boostr help)", cmd)
+	return fmt.Errorf("unknown command %q (hyperscalr help)", cmd)
 }
 
 type filters struct {
@@ -214,7 +214,7 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	var count int
 	fs.StringVar(&spec.Image, "image", "", "the Docker image, pinned to a tag (required)")
 	fs.Float64Var(&spec.DiskGB, "disk", 0, "the instance's disk, GB (required)")
-	fs.StringVar(&spec.Label, "label", "", "a name for the instance (default: a minted boostr-… label)")
+	fs.StringVar(&spec.Label, "label", "", "a name for the instance (default: a minted hyperscalr-… label)")
 	fs.StringVar(&onstart, "onstart", "", "a script file run when the instance starts")
 	fs.Float64Var(&spec.BidPrice, "bid-price", 0, "with --bid, the $/h to bid (default: the offer's minimum)")
 	fs.Int64Var(&offerID, "offer", 0, "rent this offer instead of the cheapest match")
@@ -320,7 +320,7 @@ func waitInstance(ctx context.Context, c *vast.Client, id int64, ready bool, rea
 			return err
 		}
 		if host, port, ok := in.SSH(); in.Running() && ok {
-			fmt.Fprintf(out, "running: ssh -p %s root@%s   (boostr ssh %d)\n", port, host, id)
+			fmt.Fprintf(out, "running: ssh -p %s root@%s   (hyperscalr ssh %d)\n", port, host, id)
 			if !ready {
 				return nil
 			}
@@ -329,7 +329,7 @@ func waitInstance(ctx context.Context, c *vast.Client, id int64, ready bool, rea
 		fmt.Fprintf(out, "  %s %s\n", in.ActualStatus, strings.TrimSpace(in.StatusMsg))
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("instance %d not running yet: %w (boostr ls)", id, ctx.Err())
+			return fmt.Errorf("instance %d not running yet: %w (hyperscalr ls)", id, ctx.Err())
 		case <-time.After(10 * time.Second):
 		}
 	}
@@ -394,7 +394,7 @@ func logs(ctx context.Context, c *vast.Client, args []string, out io.Writer) err
 
 func key(ctx context.Context, c *vast.Client, args []string, out io.Writer) error {
 	if len(args) == 0 || args[0] != "add" {
-		return errors.New("usage: boostr key add [PUBKEY_FILE]")
+		return errors.New("usage: hyperscalr key add [PUBKEY_FILE]")
 	}
 	path := ""
 	if len(args) > 1 {
@@ -427,7 +427,7 @@ func key(ctx context.Context, c *vast.Client, args []string, out io.Writer) erro
 func lifecycleArgs(cmd string, args []string) (id int64, keep bool, err error) {
 	keep = slices.Contains(args, "--keep")
 	if keep && cmd != "stop" {
-		return 0, false, fmt.Errorf("--keep is for boostr stop")
+		return 0, false, fmt.Errorf("--keep is for hyperscalr stop")
 	}
 	id, err = instanceID(slices.DeleteFunc(slices.Clone(args), func(a string) bool { return a == "--keep" }))
 	return id, keep, err
@@ -435,7 +435,7 @@ func lifecycleArgs(cmd string, args []string) (id int64, keep bool, err error) {
 
 func instanceID(args []string) (int64, error) {
 	if len(args) == 0 {
-		return 0, errors.New("name the instance id (boostr ls)")
+		return 0, errors.New("name the instance id (hyperscalr ls)")
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {

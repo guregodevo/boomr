@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/guregodevo/boostr/vast"
+	"github.com/guregodevo/hyperscalr/vast"
 )
 
 // A setup script run at start (--onstart) says how it went in files on the
@@ -19,9 +19,9 @@ import (
 const defaultSetupTimeout = time.Hour
 
 const (
-	readyFile  = "/root/boostr-ready"
-	failedFile = "/root/boostr-failed"
-	setupLog   = "/root/boostr-setup.log"
+	readyFile  = "/root/hyperscalr-ready"
+	failedFile = "/root/hyperscalr-failed"
+	setupLog   = "/root/hyperscalr-setup.log"
 )
 
 // setup is what a box says of its setup script: state "ready", "failed" or
@@ -52,7 +52,7 @@ func waitReady(ctx context.Context, probe func(context.Context) setup, every tim
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("the setup is not done: %w (boostr ssh ID tail %s)", ctx.Err(), setupLog)
+			return fmt.Errorf("the setup is not done: %w (hyperscalr ssh ID tail %s)", ctx.Err(), setupLog)
 		case <-time.After(every):
 		}
 	}
@@ -70,7 +70,7 @@ func probeBox(c *vast.Client, id int64) func(context.Context) setup {
 		if !in.Running() || !ok {
 			return setup{"waiting for the instance:", in.ActualStatus}
 		}
-		script := fmt.Sprintf("if [ -f %[1]s ]; then echo boostr:ready; cat /root/boostr-manifest 2>/dev/null; elif [ -f %[2]s ]; then echo boostr:failed; tail -n 20 %[3]s; else echo boostr:running; tail -n 1 %[3]s 2>/dev/null; fi", readyFile, failedFile, setupLog)
+		script := fmt.Sprintf("if [ -f %[1]s ]; then echo hyperscalr:ready; cat /root/hyperscalr-manifest 2>/dev/null; elif [ -f %[2]s ]; then echo hyperscalr:failed; tail -n 20 %[3]s; else echo hyperscalr:running; tail -n 1 %[3]s 2>/dev/null; fi", readyFile, failedFile, setupLog)
 		b, err := exec.CommandContext(ctx, "ssh", "-p", port, "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15", "root@"+host, script).Output()
 		if err != nil {
 			return setup{"waiting for ssh:", strings.TrimSpace(fmt.Sprint(err))}
@@ -82,7 +82,7 @@ func probeBox(c *vast.Client, id int64) func(context.Context) setup {
 // parseProbe reads probeBox's output, past whatever the host's ssh banner
 // put before it.
 func parseProbe(s string) setup {
-	_, rest, ok := strings.Cut(s, "boostr:")
+	_, rest, ok := strings.Cut(s, "hyperscalr:")
 	if !ok {
 		return setup{"waiting for ssh:", "no answer"}
 	}
@@ -102,11 +102,11 @@ func waitSetup(ctx context.Context, c *vast.Client, id int64, timeout time.Durat
 	return waitReady(ctx, probeBox(c, id), 15*time.Second, out)
 }
 
-// waitCmd is `boostr wait ID [--timeout D]`: an instance rented or started
+// waitCmd is `hyperscalr wait ID [--timeout D]`: an instance rented or started
 // again, until its setup script is done.
 func waitCmd(ctx context.Context, c *vast.Client, args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: boostr wait ID [--timeout 1h]")
+		return errors.New("usage: hyperscalr wait ID [--timeout 1h]")
 	}
 	id, err := instanceID(args)
 	if err != nil {
