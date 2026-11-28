@@ -14,6 +14,7 @@ boostr key add                    # your ~/.ssh public key, once per account
 |---|---|
 | `boostr offers [filters]` | the cheapest matching offers; needs no key |
 | `boostr up --image IMG --disk GB [filters]` | rents the cheapest match, waits until it runs, prints the ssh command |
+| `boostr up … --count N` | rents the N cheapest matching offers in one command, one instance each, and waits for each |
 | `boostr up … --with janis,memdoor` | also installs them, and returns when they are ready (below) |
 | `boostr up … --onstart SCRIPT --ready` | runs your own script at start and waits until it writes `/root/boostr-ready`; a script that writes `/root/boostr-failed` ends the wait with the end of `/root/boostr-setup.log` |
 | `boostr deploy ID --with janis,memdoor` | installs them on a running instance, or upgrades what has another version |
@@ -26,6 +27,9 @@ boostr key add                    # your ~/.ssh public key, once per account
 | `boostr stop ID --keep` / `boostr start ID` | stop it and keep its disk (billed), or start a kept one again; when the host's GPUs are rented out, vast.ai queues the start, boostr says so, and `boostr stop --keep ID` cancels it |
 | `boostr rm ID` | destroy it and its disk |
 | `boostr credit` | the account's balance |
+| `boostr pool serve [--addr 127.0.0.1:18900]` | the ring memdoor sends its requests to (`AI_GATEWAY_BASE_URL=http://127.0.0.1:18900/v1`, `AI_GATEWAY_API=chat`); each run (`X-Memdoor-Run`) stays on one box, placed by consistent hashing |
+| `boostr pool add ID...` | opens an ssh tunnel to each box's janis (`--port 8093`), checks `/health`, adds it to the ring; a box already in the ring whose janis answers is left as it is |
+| `boostr pool ls` | the ring's boxes, their endpoints and runs |
 
 ## Filters
 
