@@ -11,7 +11,7 @@ import (
 //go:embed recipes/*.sh
 var recipeFiles embed.FS
 
-// recipes are what `boostr up --with` installs, in the order they run.
+// recipes are what `hyperscalr up --with` installs, in the order they run.
 var recipes = []string{"janis", "memdoor"}
 
 // recipeImage and recipeDisk are up's defaults with --with: CUDA for
@@ -30,7 +30,7 @@ var recipeValue = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 func setupScript(with []string, p pins) (string, error) {
 	for _, w := range with {
 		if !slices.Contains(recipes, w) {
-			return "", fmt.Errorf("no recipe %q: boostr installs %s", w, strings.Join(recipes, ", "))
+			return "", fmt.Errorf("no recipe %q: hyperscalr installs %s", w, strings.Join(recipes, ", "))
 		}
 	}
 	vars := [][2]string{}

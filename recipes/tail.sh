@@ -1,4 +1,4 @@
-mv /root/boostr-manifest.new /root/boostr-manifest
-touch /root/boostr-ready
+mv /root/hyperscalr-manifest.new /root/hyperscalr-manifest
+touch /root/hyperscalr-ready
 echo "== ready"
-cat /root/boostr-manifest
+cat /root/hyperscalr-manifest

@@ -11,7 +11,7 @@ func TestTheHelpSaysAStopDestroys(t *testing.T) {
 	if err := run([]string{"help"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "boostr stop ID [--keep]") || !strings.Contains(out.String(), "destroy one; --keep stops it") {
+	if !strings.Contains(out.String(), "hyperscalr stop ID [--keep]") || !strings.Contains(out.String(), "destroy one; --keep stops it") {
 		t.Errorf("help:\n%s", out.String())
 	}
 }

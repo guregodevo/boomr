@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run at start on a vast.ai machine (boostr up --onstart): Go, janis built
+# Run at start on a vast.ai machine (hyperscalr up --onstart): Go, janis built
 # with ggml's CUDA kernels at JANIS_REF, and the 27B pulled. The log is
 # /root/janis-setup.log; /root/janis-ready is written when it is done.
 set -euo pipefail
