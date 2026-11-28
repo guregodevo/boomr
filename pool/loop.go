@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Renter rents and destroys boxes. The boostr command implements it on
+// Renter rents and destroys boxes. The hyperscalr command implements it on
 // vast.ai; a dry run logs the decisions and calls nothing.
 type Renter interface {
 	Rent(ctx context.Context) (Member, error)
