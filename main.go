@@ -23,6 +23,7 @@ const usage = `boostr rents GPU machines on vast.ai.
 
   boostr offers [filters]                     the cheapest matching offers (no key needed)
   boostr up --image IMG --disk GB [filters]   rent the cheapest matching offer
+     [--count N]                              the N cheapest matches, one instance each
      [--with janis,memdoor]                   install them at start, return when they are ready
      [--onstart SCRIPT [--ready]]             run SCRIPT at start; --ready waits until it is done
   boostr wait ID [--timeout 1h]               wait until an instance's setup is done
@@ -36,6 +37,9 @@ const usage = `boostr rents GPU machines on vast.ai.
   boostr start ID                             start a kept one again
   boostr rm ID                                destroy one and its disk
   boostr credit                               the account's balance
+  boostr pool serve [--addr HOST:PORT]        the ring memdoor's requests go through, one box per run
+  boostr pool add ID... [--port 8093]         tunnel to each box's janis and add it (again: a no-op)
+  boostr pool ls                              the ring's boxes and runs
   boostr key add [PUBKEY_FILE]                add an SSH public key to the account
 
 filters: --gpu "H100 SXM,H100 PCIE"  --gpus 1  --min-gpu-ram GB  --max-price $/h
@@ -79,7 +83,7 @@ func run(args []string, out io.Writer) error {
 	case "deploy":
 		return deploy(ctx, c, rest, out)
 	case "pool":
-		return poolCmd(ctx, rest, out)
+		return poolCmd(ctx, c, rest, out)
 	case "stop", "start", "rm":
 		id, keep, err := lifecycleArgs(cmd, rest)
 		if err != nil {
@@ -207,12 +211,14 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	var want pins
 	var wait, ready bool
 	var readyTimeout time.Duration
+	var count int
 	fs.StringVar(&spec.Image, "image", "", "the Docker image, pinned to a tag (required)")
 	fs.Float64Var(&spec.DiskGB, "disk", 0, "the instance's disk, GB (required)")
 	fs.StringVar(&spec.Label, "label", "", "a name for the instance (default: a minted boostr-… label)")
 	fs.StringVar(&onstart, "onstart", "", "a script file run when the instance starts")
 	fs.Float64Var(&spec.BidPrice, "bid-price", 0, "with --bid, the $/h to bid (default: the offer's minimum)")
 	fs.Int64Var(&offerID, "offer", 0, "rent this offer instead of the cheapest match")
+	fs.IntVar(&count, "count", 1, "rent this many of the cheapest matching offers, one instance each")
 	fs.BoolVar(&wait, "wait", true, "wait until the instance runs and print how to ssh in")
 	fs.StringVar(&with, "with", "", "install these at start: "+strings.Join(recipes, ",")+" (implies --ready)")
 	want.register(fs)
@@ -223,6 +229,12 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	}
 	if onstart != "" && with != "" {
 		return errors.New("--onstart or --with, not both")
+	}
+	if count < 1 {
+		return errors.New("--count must be at least 1")
+	}
+	if count > 1 && (offerID != 0 || f.bid || spec.Label != "") {
+		return errors.New("--count takes the cheapest offers: no --offer, --bid or --label")
 	}
 	if onstart != "" {
 		b, err := os.ReadFile(onstart)
@@ -247,21 +259,25 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	if err := spec.Validate(); err != nil {
 		return err
 	}
+	offerIDs := []int64{offerID}
 	if offerID == 0 {
 		sel := f.selectors()
 		if sel.MinDiskGB < spec.DiskGB {
 			sel.MinDiskGB = spec.DiskGB
 		}
-		sel.Limit = 1
+		sel.Limit = count
 		os, err := c.Offers(ctx, sel)
 		if err != nil {
 			return err
 		}
-		if len(os) == 0 {
-			return errors.New("no offer matches")
+		if len(os) < count {
+			return fmt.Errorf("%d offers match, %d asked", len(os), count)
 		}
 		printOffers(out, os, f.bid)
-		offerID = os[0].ID
+		offerIDs = offerIDs[:0]
+		for _, o := range os[:count] {
+			offerIDs = append(offerIDs, o.ID)
+		}
 		if f.bid && spec.BidPrice == 0 {
 			spec.BidPrice = os[0].MinBid
 		}
@@ -277,14 +293,27 @@ func up(ctx context.Context, c *vast.Client, args []string, out io.Writer) error
 	if f.bid && spec.BidPrice <= 0 {
 		return fmt.Errorf("offer %d has no bid price: pass --bid-price", offerID)
 	}
-	id, label, err := c.Create(ctx, offerID, spec)
-	if err != nil {
-		return err
+	var ids []int64
+	for _, oid := range offerIDs {
+		id, label, err := c.Create(ctx, oid, spec)
+		if err != nil {
+			return fmt.Errorf("rented %v so far, then: %w", ids, err)
+		}
+		fmt.Fprintf(out, "instance %d (%s) rented from offer %d\n", id, label, oid)
+		ids = append(ids, id)
 	}
-	fmt.Fprintf(out, "instance %d (%s) rented from offer %d\n", id, label, offerID)
 	if !wait {
 		return nil
 	}
+	for _, id := range ids {
+		if err := waitInstance(ctx, c, id, ready, readyTimeout, out); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func waitInstance(ctx context.Context, c *vast.Client, id int64, ready bool, readyTimeout time.Duration, out io.Writer) error {
 	for {
 		in, err := c.Instance(ctx, id)
 		if err != nil {
